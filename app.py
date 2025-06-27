@@ -33,5 +33,6 @@ def process_csv():
 def download_file(filename):
     return send_from_directory(OUTPUT_FOLDER, filename)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))  # Render will inject PORT env var
+    app.run(host='0.0.0.0', port=port)
