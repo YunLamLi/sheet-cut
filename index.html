@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -65,16 +64,21 @@
       button.textContent = "Processing...";
 
       try {
-        const response = await fetch("http://127.0.0.1:5000/api/process", {
+        const response = await fetch("/api/process", {
           method: "POST",
           body: formData
         });
 
         const result = await response.json();
 
-        downloadLayout.href = result.layout_png;
-        downloadSummary.href = result.excel_summary;
-        output.style.display = 'block';
+        if (result.layout_png && result.excel_summary) {
+          downloadLayout.href = result.layout_png;
+          downloadSummary.href = result.excel_summary;
+          output.style.display = 'block';
+        } else {
+          alert("Output files were not generated.");
+        }
+
       } catch (error) {
         alert("Something went wrong.");
         console.error(error);
