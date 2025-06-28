@@ -67,8 +67,7 @@ def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet
 
                     rect = patches.Rectangle((rect_x, rect_y), pw, ph, edgecolor='black', facecolor='none')
                     ax.add_patch(rect)
-                    label = f"{part['Part Name']}
-{pw}x{ph}"
+                    label = f"{part['Part Name']}\n{pw}x{ph}"
                     ax.text(rect_x + pw/2, rect_y + ph/2, label,
                             fontsize=6, ha='center', va='center')
                     placed_parts += 1
