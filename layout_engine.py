@@ -63,7 +63,7 @@ def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet
 
                 rect = patches.Rectangle((x_cursor, y_cursor), pw, ph, linewidth=0.5, edgecolor='black', facecolor='lightgray')
                 ax.add_patch(rect)
-                label = f"{part['Part Name']}\n{pw}x{ph}""
+                label = f"{part['Part Name']}\n{pw}x{ph}"
                 ax.text(x_cursor + pw / 2, y_cursor + ph / 2, label, ha='center', va='center', fontsize=4, wrap=True)
                 x_cursor += pw
                 row_height = max(row_height, ph)
