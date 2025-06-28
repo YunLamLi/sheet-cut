@@ -73,8 +73,7 @@ def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet
             for x, y, pw, ph, part in layout:
                 rect = patches.Rectangle((x, y), pw, ph, linewidth=1, edgecolor='black', facecolor='lightgrey')
                 ax.add_patch(rect)
-                label = f"{part['Part Name']}
-{pw:.1f} x {ph:.1f}"
+                label = f"{part['Part Name']}\n{pw:.1f} x {ph:.1f}"
                 ax.text(x + pw / 2, y + ph / 2, label, ha='center', va='center', fontsize=7, wrap=True)
 
             os.makedirs(output_folder, exist_ok=True)
