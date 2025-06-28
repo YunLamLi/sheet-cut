@@ -1,103 +1,76 @@
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from openpyxl import Workbook
 import os
-import math
 
 def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet_height=96.0):
     df = pd.read_csv(csv_path)
+    df = df.dropna(subset=['Width', 'Height'])
+    df['Width'] = df['Width'].astype(float)
+    df['Height'] = df['Height'].astype(float)
+    df['Thickness'] = df['Thickness'].astype(float)
+    df['Quantity'] = df['Quantity'].fillna(1).astype(int)
+    df_expanded = df.loc[df.index.repeat(df['Quantity'])].copy().reset_index(drop=True)
 
-    # Drop rows with missing required dimensions
-    df = df.dropna(subset=['Width', 'Height', 'Thickness'])
+    grouped = df_expanded.groupby('Thickness')
 
-    # Group by thickness
-    grouped = df.groupby('Thickness')
-
-    summary_data = []
+    os.makedirs(output_folder, exist_ok=True)
 
     for thickness, group in grouped:
-        parts = group.to_dict(orient='records')
-        sheet_num = 1
-        part_index = 0
-        max_parts = len(parts)
+        for strategy in ['row', 'column']:
+            fig, ax = plt.subplots(figsize=(8.27, 11.69))  # A4 portrait in inches
+            ax.set_xlim(0, sheet_width)
+            ax.set_ylim(0, sheet_height)
+            ax.invert_yaxis()
+            ax.set_aspect('equal')
+            ax.set_title(f"Thickness {thickness} - Sheet 1 ({strategy})")
 
-        while part_index < max_parts:
-            for strategy in ['row', 'column']:
-                fig, ax = plt.subplots(figsize=(8.27, 11.69))  # A4 portrait in inches
+            x_cursor = y_cursor = 0
+            row_max_height = col_max_width = 0
+            kerf = 0.25
 
-                ax.set_xlim(0, sheet_width)
-                ax.set_ylim(0, sheet_height)
-                ax.set_title(f'Thickness {thickness} - Sheet {sheet_num} ({strategy}-wise)')
-                ax.set_aspect('equal')
-                ax.axis('off')
-
-                placed_parts = 0
-                padding = 0.25  # 1/4 inch kerf margin
-
-                x_cursor = y_cursor = row_height = col_width = 0
-                layout_success = False
-
-                for i in range(part_index, max_parts):
-                    part = parts[i]
-                    pw = part['Width']
-                    ph = part['Height']
-
-                    if strategy == 'row':
-                        if x_cursor + pw > sheet_width:
-                            x_cursor = 0
-                            y_cursor += row_height + padding
-                            row_height = 0
-                        if y_cursor + ph > sheet_height:
-                            break
-                        rect_x, rect_y = x_cursor, y_cursor
-                        x_cursor += pw + padding
-                        row_height = max(row_height, ph)
-
-                    else:  # column strategy
-                        if y_cursor + ph > sheet_height:
-                            y_cursor = 0
-                            x_cursor += col_width + padding
-                            col_width = 0
-                        if x_cursor + pw > sheet_width:
-                            break
-                        rect_x, rect_y = x_cursor, y_cursor
-                        y_cursor += ph + padding
-                        col_width = max(col_width, pw)
-
-                    rect = patches.Rectangle((rect_x, rect_y), pw, ph, edgecolor='black', facecolor='none')
+            for _, part in group.iterrows():
+                pw, ph = part['Width'], part['Height']
+                if strategy == 'row':
+                    if x_cursor + pw > sheet_width:
+                        x_cursor = 0
+                        y_cursor += row_max_height + kerf
+                        row_max_height = 0
+                    if y_cursor + ph > sheet_height:
+                        break
+                    rect = patches.Rectangle((x_cursor, y_cursor), pw, ph, linewidth=1, edgecolor='black', facecolor='lightgrey')
                     ax.add_patch(rect)
-                    label = f"{part['Part Name']}\n{pw}x{ph}"
-                    ax.text(rect_x + pw/2, rect_y + ph/2, label,
-                            fontsize=6, ha='center', va='center')
-                    placed_parts += 1
+                    label = f"{part['Part Name']}\n{pw:.2f}x{ph:.2f}"
+                    ax.text(x_cursor + pw / 2, y_cursor + ph / 2, label, ha='center', va='center', fontsize=6)
+                    x_cursor += pw + kerf
+                    row_max_height = max(row_max_height, ph)
+                else:
+                    if y_cursor + ph > sheet_height:
+                        y_cursor = 0
+                        x_cursor += col_max_width + kerf
+                        col_max_width = 0
+                    if x_cursor + pw > sheet_width:
+                        break
+                    rect = patches.Rectangle((x_cursor, y_cursor), pw, ph, linewidth=1, edgecolor='black', facecolor='lightgrey')
+                    ax.add_patch(rect)
+                    label = f"{part['Part Name']}\n{pw:.2f}x{ph:.2f}"
+                    ax.text(x_cursor + pw / 2, y_cursor + ph / 2, label, ha='center', va='center', fontsize=6)
+                    y_cursor += ph + kerf
+                    col_max_width = max(col_max_width, pw)
 
-                if placed_parts == 0:
-                    continue
+            layout_filename = os.path.join(output_folder, f"layout_thickness_{thickness}_{strategy}.png")
+            plt.savefig(layout_filename, bbox_inches='tight', dpi=300)
+            plt.close()
 
-                filename = f"layout_thickness_{thickness}_sheet_{sheet_num}_{strategy}.png"
-                plt.savefig(os.path.join(output_folder, filename), bbox_inches='tight', dpi=300)
-                plt.close(fig)
-
-            part_index += placed_parts
-            sheet_num += 1
-
+    summary_wb = Workbook()
+    for thickness, group in grouped:
+        sheet = summary_wb.create_sheet(title=f"Thickness {thickness}")
+        sheet.append(["Part Name", "Width", "Height", "Thickness", "Material", "Quantity"])
         for _, row in group.iterrows():
-            summary_data.append({
-                'Part Name': row['Part Name'],
-                'Width': row['Width'],
-                'Height': row['Height'],
-                'Thickness': thickness,
-                'Material': row.get('Material', 'Default'),
-                'Quantity': row.get('Quantity', 1)
-            })
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Cut Summary'
-    headers = ['Part Name', 'Width', 'Height', 'Thickness', 'Material', 'Quantity']
-    ws.append(headers)
-    for row in summary_data:
-        ws.append([row.get(h, '') for h in headers])
-
-    wb.save(os.path.join(output_folder, 'cut_summary.xlsx'))
+            sheet.append([row["Part Name"], row["Width"], row["Height"], row["Thickness"], row.get("Material", ""), row["Quantity"]])
+    if "Sheet" in summary_wb.sheetnames:
+        del summary_wb["Sheet"]
+    excel_path = os.path.join(output_folder, "cutlist_summary.xlsx")
+    summary_wb.save(excel_path)
