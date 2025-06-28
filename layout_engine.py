@@ -1,3 +1,4 @@
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -7,71 +8,91 @@ import math
 
 def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet_height=96.0):
     df = pd.read_csv(csv_path)
+
     df = df.dropna(subset=['Width', 'Height'])
+    df['Width'] = df['Width'].astype(float)
+    df['Height'] = df['Height'].astype(float)
+    df['Thickness'] = df['Thickness'].astype(float)
+    df['Quantity'] = df['Quantity'].astype(int)
 
-    df['Area'] = df['Width'] * df['Height']
-    df = df.sort_values(by='Area', ascending=False)
+    grouped = df.groupby('Thickness')
+    layout_files = []
 
-    thickness_groups = df.groupby('Thickness')
+    for thickness, group in grouped:
+        parts = []
+        for _, row in group.iterrows():
+            for _ in range(row['Quantity']):
+                parts.append({
+                    'Part Name': row['Part Name'],
+                    'Width': row['Width'],
+                    'Height': row['Height'],
+                    'Material': row['Material']
+                })
 
-    os.makedirs(output_folder, exist_ok=True)
-    excel_path = os.path.join(output_folder, 'summary.xlsx')
-    wb = Workbook()
-    wb.remove(wb.active)
+        parts.sort(key=lambda x: max(x['Width'], x['Height']), reverse=True)
 
-    for thickness, group in thickness_groups:
-        group = group.reset_index(drop=True)
-        fig, ax = plt.subplots(figsize=(8, 8 * sheet_height / sheet_width))
-        ax.set_xlim(0, sheet_width)
-        ax.set_ylim(0, sheet_height)
-        ax.set_title(f"Layout for Thickness {thickness}\"")
-        ax.set_xlabel("inches")
-        ax.set_ylabel("inches")
+        layouts = []
+        current_sheet = []
+        remaining_height = sheet_height
+        y_offset = 0
+        x_offset = 0
+        max_row_height = 0
 
-        used_positions = []
-        current_x = 0
-        current_y = 0
-        row_max_height = 0
-
-        for i, row in group.iterrows():
-            part_width = row['Width']
-            part_height = row['Height']
-            part_name = row['Part'] if 'Part' in row and pd.notna(row['Part']) else f"Part {i+1}"
-
-            if current_x + part_width > sheet_width:
-                current_x = 0
-                current_y += row_max_height
-                row_max_height = 0
-
-            if current_y + part_height > sheet_height:
+        for part in parts:
+            pw, ph = part['Width'], part['Height']
+            if pw > sheet_width or ph > sheet_height:
                 continue
 
-            rect = patches.Rectangle((current_x, current_y), part_width, part_height,
-                                     linewidth=1, edgecolor='black', facecolor='lightgrey')
-            ax.add_patch(rect)
-            ax.text(current_x + part_width / 2, current_y + part_height / 2,
-                    part_name, ha='center', va='center', fontsize=6)
-            used_positions.append((current_x, current_y, part_width, part_height))
+            if x_offset + pw > sheet_width:
+                x_offset = 0
+                y_offset += max_row_height
+                max_row_height = 0
 
-            current_x += part_width
-            row_max_height = max(row_max_height, part_height)
+            if y_offset + ph > sheet_height:
+                layouts.append(current_sheet)
+                current_sheet = []
+                x_offset = 0
+                y_offset = 0
+                max_row_height = 0
 
-        ax.set_aspect('equal')
-        ax.invert_yaxis()
-        png_filename = os.path.join(output_folder, f'layout_thickness_{thickness}.png')
-        plt.savefig(png_filename, bbox_inches='tight')
-        plt.close()
+            current_sheet.append((x_offset, y_offset, pw, ph, part))
+            x_offset += pw
+            max_row_height = max(max_row_height, ph)
 
-        ws = wb.create_sheet(title=f"{thickness}\"")
-        ws.append(['Part', 'Width', 'Height', 'Quantity', 'Material'])
-        for _, row in group.iterrows():
-            ws.append([
-                row['Part'] if 'Part' in row else f"Part {_ + 1}",
-                row['Width'], row['Height'],
-                row['Quantity'] if 'Quantity' in row else 1,
-                row['Material'] if 'Material' in row else ''
-            ])
+        if current_sheet:
+            layouts.append(current_sheet)
 
-    wb.save(excel_path)
+        for i, layout in enumerate(layouts):
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.set_xlim(0, sheet_width)
+            ax.set_ylim(0, sheet_height)
+            ax.set_aspect('equal')
+            ax.set_title(f'Sheet Layout - Thickness {thickness} - Sheet {i+1}')
+            ax.invert_yaxis()
 
+            for x, y, pw, ph, part in layout:
+                rect = patches.Rectangle((x, y), pw, ph, linewidth=1, edgecolor='black', facecolor='lightgrey')
+                ax.add_patch(rect)
+                label = f"{part['Part Name']}
+{pw:.1f} x {ph:.1f}"
+                ax.text(x + pw / 2, y + ph / 2, label, ha='center', va='center', fontsize=7, wrap=True)
+
+            os.makedirs(output_folder, exist_ok=True)
+            layout_path = os.path.join(output_folder, f'layout_thickness_{thickness}_sheet_{i+1}.png')
+            plt.savefig(layout_path, bbox_inches='tight')
+            plt.close()
+            layout_files.append(layout_path)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Cut Summary'
+    ws.append(['Part Name', 'Width', 'Height', 'Thickness', 'Material', 'Quantity'])
+
+    for _, row in df.iterrows():
+        ws.append([row['Part Name'], row['Width'], row['Height'], row['Thickness'], row['Material'], row['Quantity']])
+
+    summary_path = os.path.join(output_folder, 'cut_summary.xlsx')
+    wb.save(summary_path)
+
+    return layout_files, summary_path
 
