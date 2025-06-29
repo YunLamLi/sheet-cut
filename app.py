@@ -1,7 +1,7 @@
-
 from flask import Flask, request, render_template, send_from_directory, jsonify
 import os
 from layout_engine import generate_layout_and_summary
+import traceback
 
 app = Flask(__name__)
 
@@ -35,7 +35,14 @@ def process_api():
     csv_path = os.path.join(OUTPUT_FOLDER, 'input.csv')
     file.save(csv_path)
 
-    generate_layout_and_summary(csv_path, OUTPUT_FOLDER)
+    try:
+        print("Starting layout generation...")
+        generate_layout_and_summary(csv_path, OUTPUT_FOLDER)
+        print("Layout generation completed.")
+    except Exception as e:
+        print("Layout generation failed:")
+        traceback.print_exc()
+        return jsonify({'error': 'Layout generation failed', 'details': str(e)}), 500
 
     png_files = sorted([f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.png')])
     png_links = [f"/output/{f}" for f in png_files]
