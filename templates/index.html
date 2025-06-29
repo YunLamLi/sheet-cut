@@ -36,13 +36,12 @@
   <button id="generateBtn">Generate Layout + Summary</button>
 
   <!-- Results -->
-  <div class="output" id="outputSection" style="display: none;">
-    <p>✅ Layout and summary generated:</p>
-    <ul>
-      <li><a id="downloadLayout" href="#" download>📥 Download PNG layout</a></li>
-      <li><a id="downloadSummary" href="#" download>📥 Download Excel summary</a></li>
-    </ul>
-  </div>
+<div class="output" id="outputSection" style="display: none;">
+  <p>✅ Layout and summary generated:</p>
+  <ul id="layoutList"></ul>
+  <p><a id="excelLink" href="#" download></a></p>
+</div>
+
 
 <script>
   const upload = document.getElementById('csvUpload');
