@@ -44,49 +44,68 @@
     </ul>
   </div>
 
-  <script>
-    const upload = document.getElementById('csvUpload');
-    const button = document.getElementById('generateBtn');
-    const output = document.getElementById('outputSection');
-    const downloadLayout = document.getElementById('downloadLayout');
-    const downloadSummary = document.getElementById('downloadSummary');
+<script>
+  const upload = document.getElementById('csvUpload');
+  const button = document.getElementById('generateBtn');
+  const output = document.getElementById('outputSection');
+  const downloadList = document.getElementById('downloadList');
+  const downloadSummary = document.getElementById('downloadSummary');
 
-    button.addEventListener('click', async () => {
-      if (!upload.files[0]) {
-        alert("Please upload a .csv file first.");
-        return;
-      }
+  button.addEventListener('click', async () => {
+    if (!upload.files[0]) {
+      alert("Please upload a .csv file first.");
+      return;
+    }
 
-      const formData = new FormData();
-      formData.append("file", upload.files[0]);
+    const formData = new FormData();
+    formData.append("file", upload.files[0]);
 
-      button.disabled = true;
-      button.textContent = "Processing...";
+    button.disabled = true;
+    button.textContent = "Processing...";
 
-      try {
-        const response = await fetch("/api/process", {
-          method: "POST",
-          body: formData
+    try {
+      const response = await fetch("/api/process", {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      // Clear previous results
+      downloadList.innerHTML = "";
+
+      // Add PNG links
+      if (result.layout_pngs && Array.isArray(result.layout_pngs)) {
+        result.layout_pngs.forEach((link, index) => {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = link;
+          a.download = "";
+          a.textContent = `📐 Layout ${index + 1}`;
+          li.appendChild(a);
+          downloadList.appendChild(li);
         });
-
-        const result = await response.json();
-
-        if (result.layout_png && result.excel_summary) {
-          downloadLayout.href = result.layout_png;
-          downloadSummary.href = result.excel_summary;
-          output.style.display = 'block';
-        } else {
-          alert("Output files were not generated.");
-        }
-
-      } catch (error) {
-        alert("Something went wrong.");
-        console.error(error);
-      } finally {
-        button.disabled = false;
-        button.textContent = "Generate Layout + Summary";
       }
-    });
-  </script>
+
+      // Excel summary link
+      if (result.excel_summary) {
+        downloadSummary.href = result.excel_summary;
+        downloadSummary.style.display = "inline";
+      } else {
+        downloadSummary.style.display = "none";
+      }
+
+      output.style.display = "block";
+
+    } catch (error) {
+      alert("Something went wrong.");
+      console.error(error);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Generate Layout + Summary";
+    }
+  });
+</script>
+
 </body>
 </html>
