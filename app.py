@@ -19,30 +19,35 @@ def index():
 @app.route('/api/process', methods=['POST'])
 def process_api():
     if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        return jsonify({'error': 'No file uploaded'}), 400
 
     file = request.files['file']
-    if not file.filename.endswith('.csv'):
-        return jsonify({"error": "Invalid file type"}), 400
+    if not file:
+        return jsonify({'error': 'File is empty'}), 400
+
+    # Clean up previous results
+    clean_output_folder()
 
     # Save uploaded CSV
-    csv_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    csv_path = os.path.join(OUTPUT_FOLDER, 'input.csv')
     file.save(csv_path)
 
-    # Generate layout and summary files
+    # Generate layout and summary
     generate_layout_and_summary(csv_path, OUTPUT_FOLDER)
 
-    # Find output files
-    layout_file = next((f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.png')), None)
-    summary_file = next((f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.xlsx')), None)
+    # Gather all PNG layout files
+    png_files = sorted([f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.png')])
+    png_links = [f"/output/{f}" for f in png_files]
 
-    if layout_file and summary_file:
-        return jsonify({
-            "layout_png": f"/output/{layout_file}",
-            "excel_summary": f"/output/{summary_file}"
-        })
-    else:
-        return jsonify({"error": "Output files not found"}), 500
+    # Get the Excel summary
+    xlsx_files = sorted([f for f in os.listdir(OUTPUT_FOLDER) if f.endswith('.xlsx')])
+    excel_link = f"/output/{xlsx_files[0]}" if xlsx_files else ""
+
+    return jsonify({
+        'layout_pngs': png_links,
+        'excel_summary': excel_link
+    })
+
 
 # Serve output files (PNG/XLSX)
 @app.route('/output/<filename>')
