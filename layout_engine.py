@@ -1,4 +1,3 @@
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -24,6 +23,7 @@ def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet
             sheet_count = 1
             kerf = 0.25
             while parts:
+                prev_count = len(parts)
                 fig, ax = plt.subplots(figsize=(8.27, 11.69))  # A4 portrait
                 ax.set_xlim(0, sheet_width)
                 ax.set_ylim(0, sheet_height)
@@ -72,6 +72,10 @@ def generate_layout_and_summary(csv_path, output_folder, sheet_width=48.0, sheet
                 layout_filename = os.path.join(output_folder, f"layout_thickness_{thickness}_sheet_{sheet_count}_{strategy}.png")
                 plt.savefig(layout_filename, dpi=300, bbox_inches='tight')
                 plt.close()
+
+                if len(remaining_parts) == prev_count:
+                    print(f"Warning: could not place remaining parts for thickness {thickness} using strategy '{strategy}'.")
+                    break
 
                 parts = remaining_parts
                 sheet_count += 1
